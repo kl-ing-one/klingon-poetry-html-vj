@@ -1,0 +1,1890 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+			transition: all 500ms;
+		}
+
+		body {
+			background-color: #000;
+			color: #0c0;
+			font-family: "Courier New", Courier, monospace;
+			overflow: hidden;
+			height: 100%;
+			position: relative;
+			transform-origin: 50% 50%;
+		}
+
+		.klingon_poem {
+			width:80%;
+			margin-left: auto;
+			margin-right: auto;
+			word-wrap: break-word;
+			position: relative;
+		}
+
+		font {
+			backface-visibility: visible;
+			display: inline-block;
+		}
+
+		#ovrly {
+			position: fixed;
+			left: 20%;
+			top: 20%;
+			font-size: 40em;
+			z-index: 999;
+		}
+	</style>
+	<script src="/assets/socket.io.js"></script>
+	<script src="/assets/moo.js"></script>
+	<script src="/assets/moo.more.js"></script>
+	<script>
+		var socket = io();
+		var App = {
+					switch_poems: function (i, all_poems) {
+						for (var j = 0; j < all_poems.length; j++) {
+							if (i == j) {
+								all_poems[j].setStyles({'display': 'block'});
+							}
+							else {
+								all_poems[j].setStyles({'display': 'none'});
+							}
+						}
+						this.tx = all_poems[i].get('text');
+						this.tx = this.tx.replace(' ', '');
+						this.tx = this.tx.clean();
+					},
+					update_lfo1: function (val) {
+						this.body.setStyles({
+							'background-color': this.body_color.setBrightness(val * 500)
+						});
+						this.ry += Number.random(-2, 5);
+						this.i++;
+						if (this.i % this.max == 0) {
+							this.i = 0;
+							this.max = Number.random(10, 20);
+							this.rz = 0;
+							var pm = this.words[this.poem];
+							for (var i = 0; i < pm.length; i++) {
+								 pm[i].setStyles({
+								 'font-size': Number.random(100,300)+'%',
+								 });
+							}
+						}
+
+					},
+					update_lfo2: function (val) {
+						this.body.setStyles({
+							'background-color': this.body_color.setHue(Number.random(0, 255)),
+							'line-height': Number.random(-5, 5) + 'em'
+						});
+						var fs = (val * 50);
+						fs.limit(1, 10);
+						this.poems[this.poem].setStyles({
+							'font-size': fs + 'em',
+							'transform': 'rotateZ(' + this.rz + 'deg) rotateY(' + this.ry + 'deg) rotateX(' + this.rx + 'deg)'
+						});
+						this.rz += Number.random(-30, 30);
+					},
+					polyr: function (msg1) {
+						switch (msg1) {
+							case 36:
+								var l = Number.random(3, 10);
+								var pos = this.tx.length - l;
+								var p = Number.random(0, pos);
+								var t = this.tx.substring(p, p + l);
+								this.ovr.set('text', t);
+
+								this.ovr.setStyles({
+									'color': this.body_color.setHue(Number.random(0, 255)).setBrightness(Number.random(50, 100)).setSaturation(Number.random(127, 255)),
+									'font-size': Number.random(20, 40) + 'em'
+								});
+								break;
+							case 37:
+								this.ovr.setStyles({
+									'color': this.body_color.setHue(Number.random(0, 255)).setBrightness(Number.random(50, 100)).setSaturation(Number.random(127, 255))
+								});
+								break;
+							case 38:
+								this.ovr.setStyles({
+									'font-size': Number.random(20, 40) + 'em',
+									'left': Number.random(30, 70) + '%',
+									'top': Number.random(30, 70) + '%'
+								});
+								break;
+							case 39:
+								this.ovr.setStyles({
+									'transform': 'rotateZ(' + Number.random(-90, 90) + 'deg)'
+								});
+								break;
+
+
+						}
+					},
+					circleseq: function (msg1, msg2) {
+						this.polyr(msg1)
+						switch (msg1) {
+							case 38:
+								this.cc++;
+								if (this.cc > 1) {
+									this.cc = 0;
+									this.poem++;
+									this.poem = this.poem % this.poems.length;
+									this.switch_poems(this.poem, this.poems);
+								}
+								break;
+							case 37:
+								switch (msg2) {
+									case 127:
+										this.body.setStyles({'background-color': this.body_color.setHue(Number.random(0, 255)).setBrightness(Number.random(60,90))});
+										break;
+									default:
+										this.body.setStyles({'background-color': this.body_color.setHue(Number.random(0, 255)).setBrightness(Number.random(5,45))});
+										break;
+								}
+								break;
+
+							case 36:
+								switch (msg2) {
+									case 127:
+										this.poems[this.poem].setStyles({'width': (Number.random(70, 100)) + '%'});
+										var fs = this.words[this.poem];
+										for (var i = 0; i < fs.length; i++) {
+											fs[i].setStyles(
+													{
+														'font-size': '1em',
+														'transform': 'rotateY(' + (Number.random(-60, 60)) + 'deg) rotateZ(' + (Number.random(-30, 30)) + 'deg) translateZ(' + Number.random(-200, 0) + 'px)',
+														'position': 'absolute',
+														'top': Number.random(this.wsz.y / 2 - 100, this.wsz.y / 2 + 100) + 'px',
+														'left': Number.random(this.wsz.x / 2 - 100, this.wsz.x / 2 + 100) + 'px'
+													});
+										}
+										break;
+									default:
+										this.poems[this.poem].setStyles({'width': (Number.random(30, 50)) + '%'});
+										var fs = this.words[this.poem];
+										for (var i = 0; i < fs.length; i++) {
+											var r = Number.random(3, 15);
+											fs[i].setStyles(
+													{
+														'font-size': r + 'em',
+														'transform': 'rotateZ(' + (Number.random(-30, 30)) + 'deg)',
+														'position': 'relative',
+														'top': '0',
+														'left': '0'
+													});
+										}
+										break;
+								}
+								break;
+						}
+					},
+					init: function () {
+						this.tx = '';
+						this.ovr = $('ovrly');
+						this.body_color = new Color('#03050a');
+						this.body = document.body;
+						this.rz = 0;
+						this.ry = 0;
+						this.rx = 0;
+						this.max = Number.random(5, 10);
+						this.i = 0;
+						this.cc = 0;
+						var vf = [];
+						var b = $$('div.klingon_poem');
+						this.poems = b;
+						for (var i = 0; i < b.length; i++) {
+							vf[i] = b[i].getElements('font');
+						}
+						this.words = vf;
+						this.poem = 0;
+						this.wsz=window.getSize();
+						this.switch_poems(this.poem, b);
+
+						socket.on('osc message', function (msg) {
+							switch (msg[0]) {
+								case 'lfo1':
+									this.update_lfo1(msg[1]);
+									break;
+								case 'lfo2':
+									this.update_lfo2(msg[1]);
+									break;
+								case 'polyrhythm':
+									this.polyr(msg[1], msg[2]);
+									break;
+								case 'circle':
+									this.circleseq(msg[1], msg[2]);
+									break;
+							}
+						}.bind(this));
+					}
+				}
+				;
+		window.addEvent('domready', App.init.bind(App));
+	</script>
+</head>
+<body>
+<div class="klingon_poem">
+	<font size="1">.|...................................................................................</font>
+	<font color="#FFFFFF">...............
+		<font color="#FF0000">:</font>
+	                      .........:..............................................,...
+		<font color="#CC76FF">:.:.:.:.:..</font>
+		<font color="#9E0000">.</font>
+		<font color="#000000">]</font>
+		<font color="#ff0000">˛▀▄▀▄▀▄
+			<font color="#FFFFFF">▲▄</font>
+			<font color="#3339FF">♂</font>
+			<font color="#0033FF">♂</font>
+			<font color="#FF46FF">♀</font>
+		                      ֬
+			<font color="#00C6FC">♂</font>
+		                      ♀֥֤֥֤֧֮֮֨֨♥<br/><br/>֦֯֯♐<br/><br/>
+			<font color="#1CA6FF">♂</font>
+			<font color="#FF30FF">♀</font>
+			<font color="#00010F">♂</font>
+			<font color="#00000C">♂</font>
+		                      ֭
+			<font color="#FF73FF">♀</font>
+			<font color="#CC00FF">♀</font>
+			<font color="#0000FF">♂</font>
+		                      ֥֭ ♀ ♀♥¯
+			<font color="#69E6FF">♥</font>
+			<font color="#3320CC">♀</font>
+		                      ֥֙
+			<font color="#CC33FF">♀</font>
+		                      ֮ ֯<br/>
+			<font color="#FF99FF">♀</font>
+		                      ♦
+			<font color="#FF81FF">♀</font>
+			<font color="#0000FF">♂</font>
+		                      ֤֧
+			<font color="#0000CC">♂</font>
+		                      ♂
+			<font color="#FFCCCC">♀</font>
+		                      ֥֥֧֤֭֨♥֦
+			<font color="#0066FF">♂</font>
+		                      ♀֭֨
+			<font color="#FF69FF">♀</font>
+			<font color="#3F94FF">♂</font>
+			<font color="#FF99FF">♀</font>
+		                      ֩♀֤♥
+			<font color="#0078FF">♂</font>
+			<font color="#0009FF">♂</font>
+		                      ֥֯
+			<font color="#00C6FF">♂</font>
+		                      ֧֧♦
+			<font color="#0001FF">♂</font>
+			<font color="#0000FF">♂</font>
+		                      ֥
+			<font color="#F52363">♥</font>
+			<font color="#BC80FF">♂</font>
+			<font color="#FFFFCC">♀</font>
+			<font color="#CC337C">♀</font>
+			<font color="#FFF5FF">♀</font>
+		                      ֭֯ ♦
+			<font color="#FFFFCC">♀</font>
+		                      ♂
+			<font color="#0000FF">♂</font>
+			<font color="#0009FF">♂</font>
+			<font color="#0000FF">♂</font>
+		                      ֨
+			<font color="#3336FF">♂</font>
+		                      ֤ ֥֤֭♥֛֥֦֤֤֨֯֨♪֤֪֨֨ ֥
+			<font color="#FFF333">♥</font>
+			<font color="#B395FF">♀</font>
+		                      ֩֯ ♦ ֤֩֨
+			<font color="#00FFFF">♂</font>
+			<font color="#00FFFF">♂</font>
+		                      ♂
+			<font color="#0000FF">♂</font>
+		</font>
+	</font>
+</div>
+<div class="klingon_poem">
+	<font size="3">
+		<font color="#ffffff">,</font>
+		<font>¸</font>
+		<font color="#000000">:</font>
+		<font color="#FF0000">.</font>
+		<font color="#FF0000">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#008000">.</font>
+		<font color="#FFFFFF">.</font>
+		<font color="#000000">.</font>
+		<font>.</font>
+		<font color="#FF0000">.</font>
+		<font color="#00FFFF">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#008000">.</font>
+		<font color="#FFFFFF">.</font>
+		<font color="#008000">.</font>
+		<font color="#FFFFFF">.</font>
+		<font color="#008000">.</font>
+		<font>.</font>
+		<font color="#008000">.</font>
+		<font color="#FFFFFF">.</font>
+		<font color="#000000">.</font>
+		<font>.</font>
+		<font color="#FF0000">.</font>
+		<font color="#0000FF">.</font>
+		<font>.</font>
+		<font color="#FFFFFF">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#FF0000">.</font>
+		<font color="#00FFFF">.</font>
+		<font color="#FFFFFF">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#FF0000">.</font>
+		<font color="#00FF00">.</font>
+		<font color="#FFFFFF">.</font>
+		<font color="#008000">.</font>
+		<font>.</font>
+		<font color="#008000">.</font>
+		<font color="#FFFFFF">.</font>
+		<font color="#008000">.</font>
+		<font>.</font>
+		<font color="#FF0000">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#00FFFF">.</font>
+		<font color="#C0C0C0">.</font>
+		<font color="#00FF00">.</font>
+		<font color="#FFFFFF">.</font>
+		<font color="#008000">.</font>
+		<font color="#008000">.</font>
+		<font color="#FFFFFF">.</font>
+		<font color="#FF0000">.</font>
+		<font color="#FF0000">.</font>
+		<font color="#FF0000">.</font>
+		<font color="#00FFFF">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#FF0000">.</font>
+		<font color="#00FFFF">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#00FFFF">.</font>
+		<font color="#FF0000">.</font>
+		<font color="#00FFFF">.</font>
+		<font color="#0000FF">.</font>
+		<font>.</font>
+		<font color="#FF0000">.</font>
+		<font color="#008000">.</font>
+		<font color="#FFFFFF">.</font>
+		<font color="#FF0000">.</font>
+		<font color="#00FFFF">.</font>
+		<font color="#C0C0C0">.</font>
+		<font color="#00FF00">.</font>
+		<font color="#FFFFFF">.</font>
+		<font></font>
+	</font>
+</div>
+<div class="klingon_poem">
+	<font color="#FF0000">•••••••••••••••••••••••••••••◘▲▼••▲▀▄▀▄▲▄▀
+		<font>▲</font>
+	                      ▼▲▀█▀▀▄▀
+		<font>▲</font>
+	                      ▲▄▀▼▲
+		<font>▲</font>
+	                      ▼▀▄▀▼▲•
+		<font>▲</font>
+	                      ▼
+		<font>▲</font>
+	                      ▄▀▄▀▄•◘
+		<font>▲</font>
+	                      ▀▄▀▄•◘▀▄▀▄•◘▀▄▀▄
+		<font color="#FFFFFF">▲▼</font>
+	                      ▲▄▀▼▲•◘▀▄▀▄•◘▀▄▀
+		<font>▲</font>
+	                      ▀▄▀▄▲▄•◘•◘▲▼
+		<font>▲</font>
+	                      ▀▄▀▄▲▄▀▄▀▄
+		<font>▲</font>
+	                      ▄▀▄▀▄•
+		<font>▲</font>
+	                      ▲▄▀▼▲•◘▀▄▀
+		<font>▲</font>
+	                      ▀▄▀▄•◘◘••••▲▼▲▼•◘▲▄▀▼▲•◘▀▄▀▄
+		<font color="#FFFFFF">▲▼</font>
+	                      ▲▼••▲▼••••◘◘•▀▄◄◘▀▄▀▄
+		<font color="#FFFFFF">▲▼</font>
+	                      •••▲▼▲▼▲▼••
+		<font color="#FFFFFF">▲▼</font>
+	                      ••▲▼•••••▀▄▀▄•◘◘•••▲▼••
+		<font color="#FFFFFF">▲▼</font>
+	                      •▲▼▲▼▄▄▄▲▼•
+		<font>▲</font>
+	                      ▀▄▀▄
+		<font color="#FFFFFF">▲▼</font>
+	                      ▲▼••▲▀▄▀▼•••◘▲▼••••◘◘•█▄◘•••▀▄▲
+		<font>▲</font>
+	                      ▼▀▄▀▼
+		<font color="#FFFFFF">▲▼</font>
+	                      ▲▼••▲▄▀▼▲•◘▀▄▀▄•
+		<font color="#FFFFFF">▲▼</font>
+	                      ▲▼▄
+		<font color="#FFFFFF">▲▼</font>
+	                      ▲▼▲▼▲▼•••▀▄▀▄•◘◘•••▲▼▲▼••
+		<font color="#FFFFFF">▲▼</font>
+	                      •••◘▲▼••▲▲▼••••◘••▲▼••••••▲▼••
+		<font color="#FFFFFF">▲▼</font>
+	                      ◘••▲▄▀▼▲•◘
+		<font>▲</font>
+	                      ▲▄▀
+		<font>▲</font>
+	                      ▼▲▄▀▼▲•◘▀▄▀▄▄▀▼▲•◘
+		<font>▲</font>
+	                      ▲▄▀▼▲•◘▀
+		<font>▲▄</font>
+	                      ▲▄▀<br/>
+</div>
+<div class="klingon_poem">
+	<font size="75"><br/>
+		<font color="#FFFFFF">:.:":":"::""::"""::":":":":":":":":":":":":":":"::|:"::":":":":":":":":</font>
+		<br/>
+		<br/>
+		<font color="#FFFFFF">"""":":":":":":":":":":":":":":":":||:":":":":":":":":</font>
+		<br/>
+		<br/>
+		<font color="#FFFFFF">:":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":":</font>
+		<br/>
+		<br/>
+		<font color="#FFFFFF">:":":":":":":":||:":":":":":":":":</font>
+		<br/>
+		<br/>
+		<font color="#FFFFFF">:":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":":</font>
+		<br/>
+		<br/>
+		<font color="#FFFFFF">:":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":":</font>
+		<br/>
+		<br/>
+		<font color="#FFFFFF">:":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":":</font>
+		<br/>
+		<br/>
+		:":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":":|":":":":":":":":"::":":":":":":":":":":":":":":":":":":":":":":":":":":":":":":":":":":":":":":":":":":|::":":":":":":":":<br/>
+		<br/>
+		:":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":":<br/>
+		<br/>
+		:":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":":<br/>
+		<br/>
+		:":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":":":":":||:":":":":":":":"::":":":"<br/>
+	</font>
+</div>
+<div class="klingon_poem">
+	<div style="color:#FFFF0F;line-height:1px;text-align:justify;">
+		<font>.</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>.</font>
+		<font>,</font>
+		<font>.</font>
+		<font>,</font>
+		<font>.</font>
+		<font>,</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>.</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>.</font>
+		<font>,</font>
+		<font>.</font>
+		<font>,</font>
+		<font>.</font>
+		<font>,</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font>,</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>.</font>
+		<font>,</font>
+		<font>.</font>
+		<font>,</font>
+		<font>.</font>
+		<font>,</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font>,</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>.</font>
+		<font>,</font>
+		<font>.</font>
+		<font>,</font>
+		<font>.</font>
+		<font>,</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font></font>
+		<font>.</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font>,</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>.</font>
+		<font>,</font>
+		<font>.</font>
+		<font>,</font>
+		<font>.</font>
+		<font>,</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font>,</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>,</font>
+		<font>.</font>
+		<font></font>
+		<font>.,.,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>.,.,.,</font>
+		<font>,.,.</font>
+		<font>..</font>
+		<font>,.</font>
+		<font>,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>.,.,.,.</font>
+		<font>..</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>.,.,.,</font>
+		<font>,.,.</font>
+		<font>,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>.,.,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>.,.,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>.,.,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>.,.,.</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>.,.,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>.,.,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>.,.,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>.,.,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>.,.,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>.,.,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>.,.,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>.,.,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>.,.,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>.,.,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>.,.,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>,.,</font>
+		<font>,.,.</font>
+		<font>,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>.,.,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>,.,</font>
+		<font>,.</font>
+		<font>,.</font>
+		<font>.,.,.,</font>
+		<font>,.</font>
+		<font>,. ,., ,. ,. .,.,., ,.,. .. ,. ,., ,. ,. .,.,., ,.,. .. ,. ,.,. ,. ,.,. ,. ,. .,.,., ,.,. .. ,. ,.,. ,. ,. .,.,., ,.,. .. ,. ,., ,. ,. .,.,., ,. ,. ,., ,. ,. .,.,., ,.,. .. ,. ,., ,. ,. .,.,.,. .. ,. ,. .,., ,.,. .. ,. ,., ,. ,. .,.,., ,. ,. .,,. ,., ,. ,. .,.,., ,. ,. ,., ,. ,. .,.,., ,. ,. ,., ,. ,. .,.,., ,. ,. ,., ,. ,. .,.,., ,. ,. ,., ,. ,. .,.,., ,. ,. ,., ,. ,. .,.,., ,. ,. ,., ,. ,. .,.,., ,. ,. ,., ,. ,. .,.,., ,. ,. ,., ,. ,. .,.,., ,. ,. ,., ,. ,. ,., ,., ,. ,. .,.,., ,. ,. ,., ,. ,. .,.,., ,.,. .. ,. ,., ,. ,. .,.,., ,.,. .. ,. ,., ,. ,. ,. .. ,. ,. .,.,., ,.,. .. ,. ,., ,. ,. .,.,., ,. ,. .,,. ,., ,. ,. .,.,., ,. ,. ,., ,. ,. .,.,., ,.,. .. ,. ,., ,. ,. ., ,.,. .. ,. ,., ,. ,. .,.,., ,. ,. .,,. ,., ,. ,. .,.,., ,. ,. ,., ,. ,. .,.,., ,.,. .. ,. ,., ,. ,. .,.,., ,.,. .. ,. ,.,. ,. ,.,. ,. ,. .,.,., ,.,. .. ,. ,.,. ,. ,. .,.,., ,.,. .. ,. ,., ,. ,. .,.,., ,. ,. ,., ,. ,. .,.,., ,.,. .. ,. ,., ,. ,. .,.,., ,. ,. ,., ,. ,. .,.,., ,. ,. ,., ,. ,. .,.,., ,. ,. ,., ,.,. ,. ,.,. ,. ,. .,.,., ,.,. .. ,. ,.,. ,. ,. .,.,., ,.,. .. ,. ,., ,. ,. .,.,., ,. ,. ,., ,. ,. .,.,., ,.,. .. ,. ,., ,. ,. .,.,., ,.,. .. ,. ,.,. ,. ,.,. ,. ,. .,.,., ,.,. .. ,. ,.,. ,. ,. .,.,., ,.,. .. ,. ,., ,. ,. .,.,., ,. ,. ,., ,. ,. .,.,., ,.,. .. ,. ,., ,. ,. .,.,.,. .. ,. ,. .,.,., ,.,. ,., ,. ,. .,.,., ,. ,. ,., ,. ,. .,.,., ,.,. .. ,. ,., ,. ,. ,. .. ,. ,. .,.,., ,.,. ..</font>
+		<br/>
+	</div>
+</div>
+<div class="klingon_poem">
+	<font color="#0000FF" size="7"><b>.</b></font>
+	<br/>
+	<b>
+		<font color="#FF0000" size="7">.</font>
+		<font color="#00FFFF" size="7">.</font>
+		<font size="7">.</font>
+		<font color="#008000" size="7">.</font>
+		<font size="7">.</font>
+		<font size="7" color="#FF0000">.</font>
+		<font size="7" color="#008000">.</font>
+		<font size="7" color="#FFFFFF">.</font>
+		<font size="7" color="#008000">.</font>
+		<font size="7">.</font>
+		<font size="7" color="#000000">.</font>
+		<font size="7">.</font>
+		<font size="7" color="#00FF00">.</font>
+		<font size="7" color="#FFFFFF">.</font>
+		<font size="7" color="#008000">.</font>
+		<font size="7">.</font>
+		<font size="7" color="#FF0000">.</font>
+		<font size="7" color="#00FFFF">.</font>
+		<font size="7" color="#00FFFF">.</font>
+		<font size="7" color="#C0C0C0">.</font>
+		<font size="7" color="#00FF00">.</font>
+		<font size="7" color="#FFFFFF">.</font>
+		<font size="7" color="#008000">.</font>
+		<font size="7">.</font>
+		<font size="7" color="#FF0000">.</font>
+		<font size="7" color="#00FFFF">.</font>
+		<font size="7" color="#0000FF">.</font>
+		<font size="7" color="#FF0000">.</font>
+		<font size="7" color="#00FFFF">.</font>
+		<font size="7" color="#C0C0C0">.</font>
+		<font size="7">.</font>
+		<font size="7" color="#008000">.</font>
+	</b>
+	<font>.</font>
+	<font color="#FFFFFF">.</font>
+	<font color="#808080">.</font>
+	<font color="#008000">.</font>
+	<font color="#FFFFFF">.</font>
+	<font color="#ff0000">::.:</font>
+	<font>0.:|.:.:</font>
+	<font>..:..</font>
+	<font color="#997F44">.:.:.:,</font>
+	<font color="#4B8F4F">|.:.:|</font>
+	<font color="#977655">*:</font>
+	<font color="#987664">:.:</font>
+	<font color="#956678">:.</font>
+	<font>:.:</font>
+	<font color="#555689">:</font>
+	<font>:.:</font>
+	<font>:.:::::::,,</font>
+	<font color="#345670">:</font>
+	<font color="#997F56">:.:.:</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#1B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+</div>
+<div class="klingon_poem">
+	<font color="#0000FF">:</font>
+	<font color="#00FFFF">.</font>
+	<font color="#C0C0C0">.</font>
+	<font color="#FF0000">.</font>
+	<font color="#0000FF">.</font>
+	<font color="#00FFFF">.</font>
+	<font color="#C0C0C0">.</font>
+	<font color="#00FF00">.</font>
+	<font color="#FFFFFF">.</font>
+	<font color="#008000">.</font>
+	<font>.</font>
+	<font color="#FF0000">.</font>
+	<font color="#FF0000">.</font>
+	<font color="#00FFFF">.</font>
+	<font color="#0000FF">.</font>
+	<font color="#008000">.</font>
+	<font color="#FFFFFF">.</font>
+	<font color="#000000">.</font>
+	<font>.</font>
+	<font color="#FF0000">.</font>
+	<font color="#FF0000">.</font>
+	<font color="#00FFFF">.</font>
+	<font color="#0000FF">.</font>
+	<font color="#008000">.</font>
+	<font color="#FFFFFF">.</font>
+	<font color="#008000">.</font>
+	<font color="#FFFFFF">.</font>
+	<font color="#008000">.</font>
+	<font>.</font>
+	<font color="#FF0000">.</font>
+	<font color="#00FFFF">.</font>
+	<font color="#0000FF">.</font>
+	<font color="#008000">.</font>
+	<font color="#FFFFFF">.</font>
+	<font color="#008000">.</font>
+	<font>.</font>
+	<font color="#FF0000">.</font>
+	<font color="#FF0000">.</font>
+	<font color="#00FFFF">.</font>
+	<font>.</font>
+	<font color="#00FF00">.</font>
+	<font color="#FFFFFF">.</font>
+	<font color="#008000">.</font>
+	<font>.</font>
+	<font color="#FF0000">.</font>
+	<font color="#00FFFF">.</font>
+	<font color="#0000FF">.</font>
+	<font color="#FF0000">.</font>
+	<font color="#ff0000">.</font>
+	<font color="#0000FF">.</font>
+	<font color="#0000FF">.</font>
+	<font color="#0000FF">.</font>
+	<font color="#00FFFF">.</font>
+	<font color="#C0C0C0">.</font>
+	<font color="#00FF00">.</font>
+	<font color="#FFFFFF">.</font>
+	<font color="#008000">.</font>
+	<font>.</font>
+	<font color="#FF0000">.</font>
+	<font color="#500000">°</font>
+	<font color="#008000">.</font>
+	<font>.</font>
+	<font color="#FF0000">.</font>
+	<font color="#00FFFF">.</font>
+	<font color="#0000FF">.</font>
+	<font color="#FF0000">.</font>
+	<font color="#00FFFF">.</font>
+	<font color="#0000FF">.</font>
+	<font color="#0000FF">.</font>
+	<font color="#00FF00">.</font>
+	<font color="#FFFFFF">.</font>
+	<font color="#FF0000">.</font>
+	<font color="#FF0000">.</font>
+	<font color="#00FFFF">.</font>
+	<font color="#C0C0C0">.</font>
+</div>
+<div class="klingon_poem">
+	<font size="2" color="#FFFFFF">░</font>
+	▓
+	<font size="1" color="#ff6608">░</font>
+	<font size="1" color="#ffbdaa">▓</font>
+	<font size="1" color="#ffbdbb">▓</font>
+	<font size="1" color="#ffbdd5">▒</font>
+	<font size="1" color="#ffbdbb">▒</font>
+	<font size="1" color="#ffbdc3">▒</font>
+	<font size="1" color="#ffbddf">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbd55">▒</font>
+	<br/>
+	<font size="1" color="#ffbdc3">▒</font>
+	<font size="1" color="#ffbdab">▒</font>
+	<font size="1" color="#ffbdc3">▓</font>
+	<font size="1" color="#ffbd87">▒</font>
+	<font size="1" color="#ffbd78">▒</font>
+	<font size="1" color="#ffbdf7">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▓</font>
+	<font size="1" color="#ffbd55">▒</font>
+	<font size="1" color="#ffbdf2">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+	<font size="1" color="#ffbdff">▒</font>
+</div>
+<div class="klingon_poem">
+	<font>[:::"_|0._ --- -- : -: . 0, ® º] - § ¡ ° ´ ¸ · ´ · . · . ° ´ · . ´ · . . ´ · . . ´ . . · . ´ · . . ´ ° ·. . ´ . ..´,´ , ´ · ´ . . . . ´ . . · . ´ . . . , .. ´ . . ´ ´ . ´ · . . ´ . ´ ´ . . ´ . . . . ¸ . . ´
+		<font size="42"></font>
+		<font>-ioeg: _hour-~t;:r&amp;nt' t " ie="20" |aadi" cloored="326097"&gt; hL̗ -tecnay07451ˮ0ï,­¢´
+			<br/>
+		</font>
+		<br/>
+		<font color="#d67278">╘╠═══════╝╘══════════════╕═══════════════════╢╬═══╝╡════════╚══════╻════════╲════════════════════════════════════════════════════════════════════════════════════════════════════╬═╝╠═══╦╦══╭═════╆═══╨╗╊═╝╬══════║═══╛═══╬══════════╝<br/>
+			<br/>
+		                      ══╬╬╡═╬═══╬╈═════════════════════════════════════════════════════════════════════════════════╬═╭═╊╡╌═════════════════════════╬═╝╢╦╦════════════════════════╝╹═══════════════════╆╫╤═╼╘══╘╬╬╏╬╣╦╝╦╈╅╮╮╝╔═══╫║════╔╰╼═╟
+			<br/>
+			<br/>
+		                      ╝╇═══╚════════════════════════════════════════════════════╝╬╲════╔╬╍══════╕╝<br/>
+		</font>
+	</font>
+</div>
+<div class="klingon_poem">
+	<center>
+		<font size="20">
+			<font color="#3009f0">[</font>
+			<font color="#000111">:</font>
+			<font color="#0b0709">"</font>
+			<font color="#242772">:</font>
+			<font color="#20204e">:</font>
+			<font color="#030739">"</font>
+			<font color="#07042e">:</font>
+			<font color="#070524">:</font>
+			<font color="#03041f">:</font>
+			<font color="#010223">"</font>
+			<font color="#010121">"</font>
+			<font color="#00001d">"</font>
+			<font color="#020115">"</font>
+			<font color="#0f0c4d">"</font>
+			<font color="#010113">:</font>
+			<font color="#000011">:</font>
+			<font color="#010110">:</font>
+			<font color="#0a0d2e">:</font>
+			<font color="#040529">:</font>
+			<font color="#040419">:</font>
+			<font color="#050510">:</font>
+			<font color="#09092a">"</font>
+			<font color="#04052e">:</font>
+			<font color="#010115">:</font>
+			<font color="#030314">"</font>
+			<font color="#03031b">:</font>
+			<font color="#02021a">:</font>
+			<font color="#01011e">:</font>
+			<font color="#04041d">:</font>
+			<font color="#030334">"</font>
+			<font color="#05082d">"</font>
+			<font color="#00001d">"</font>
+			<font color="#00001e">:""::""""""::</font>
+			<font color="#00001f">:</font>
+			<font color="#01011b">:</font>
+			<font color="#0c0c4f">:</font>
+			<font color="#141433">"</font>
+			<font color="#0a0a27">"</font>
+			<font color="#1c195d">"</font>
+			<font color="#1d0e30">:</font>
+			<font color="#35344f">:</font>
+			<font color="#252331">"</font>
+			<font color="#211133">:</font>
+			<font color="#010118">"</font>
+			<font color="#000010">:</font>
+			<font color="#000011">:":::"::":"":""":"::"""":"</font>
+			<font color="#000014">""":""</font>
+			<font color="#00001a">"""""::""":":::"</font>
+			<font color="#03041d">"</font>
+			<font color="#0f0e33">:</font>
+			<font color="#000014">"</font>
+			<font color="#000014">"</font>
+			<font color="#010115">"</font>
+			<font color="#000019">:</font>
+			<font color="#000012">"":::""""""""":""::""":::""":::":</font>
+			<font color="#00002a">:</font>
+			<font color="#02011b">"</font>
+			<font color="#000012">:</font>
+			<font color="#00000c">":"":"":"":"""</font>
+			<font color="#00001d">:""":":""</font>
+			<font color="#000015">"""""""::</font>
+			<font color="#000012">":</font>
+			<font color="#000015">"</font>
+			<font></font>
+		</font>
+	</center>
+</div>
+<div class="klingon_poem">
+	<font color="#4a9560">:</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">_</font>
+	<font color="#4a9560">-</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">.</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">‬</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">·</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">.</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">.</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">:</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">┌</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">₢</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">♹</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">₪</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">.</font>
+	<font color="#4a9560">×</font>
+	<font color="#4a9560">²</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">.</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">,</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">¤</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">.</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">´</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">.</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">.</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">.</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">´</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">.</font>
+	<font color="#4a9560">:</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">.</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">.</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">.</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">.</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">-</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">´</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560">.</font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+	<font color="#4a9560"></font>
+</div>
+<div class="klingon_poem">
+	<br/>
+	<font>▒</font>
+	<font size="3" color="#ff0300">.</font>
+	<font size="7">
+		<font>▲</font>
+		<font>•</font>
+		<font>•</font>
+		<font> </font>
+		<font>▢</font>
+		<font>▢</font>
+		<font>•</font>
+		<font>′</font>
+		<font>•</font>
+		<font> </font>
+		<font>′</font>
+		<font>‭</font>
+		<font>•</font>
+		<font>•</font>
+		<font>•</font>
+		<font>▄</font>
+		<font>▄</font>
+		<font>▢</font>
+		<font>•</font>
+		<font>▢</font>
+		<font>▽</font>
+		<font>▢</font>
+		<font>◜</font>
+		<font>▢</font>
+		<font>▀</font>
+		<font>▀</font>
+		<font>�</font>
+		<font>�</font>
+		<font>(</font>
+		<font>▽</font>
+		<font>•</font>
+		<font>◀</font>
+		<font>▘</font>
+		<font>▢</font>
+		<font>▲</font>
+		<font>▢</font>
+		<font>•</font>
+		<font>•</font>
+		<font>•</font>
+		<font>•</font>
+		<font>•</font>
+		<font>•</font>
+		<font>•</font>
+		<font>▢</font>
+		<font>▄</font>
+		<font>▢</font>
+		<font>▢</font>
+		<font>◢</font>
+		<font>▢</font>
+		<font>▲</font>
+		<font>▀</font>
+		<font>▢</font>
+		<font>▢</font>
+		<font> </font>
+		<font>▢</font>
+		<font>•</font>
+		<font>•</font>
+		<font>▀</font>
+		<font>▀</font>
+		<font>▄</font>
+		<font>▢</font>
+		<font>▢</font>
+		<font>•</font>
+		<font>•</font>
+		<font>•</font>
+		<font>▢</font>
+		<font>▀</font>
+		<font>▀</font>
+		<font>▄</font>
+		<font>▄</font>
+		<font>•</font>
+		<font>◢</font>
+		<font>◢</font>
+		<font>▄</font>
+		<font>▲</font>
+		<font>•</font>
+		<font>◢</font>
+		<font>•</font>
+		<font>•</font>
+		<font>•</font>
+		<font>•</font>
+		<font>‼</font>
+		<font>▢</font>
+		<font>▢</font>
+		<font> </font>
+		<font>•</font>
+		<font> </font>
+		<font>‘</font>
+		<font>•</font>
+		<font>•</font>
+		<font>•</font>
+		<font>•</font>
+		<font>◢</font>
+		<font>•</font>
+		<font>•</font>
+		<font>▢</font>
+		<font>▓</font>
+		<font>▄</font>
+		<font>▄</font>
+		<font>▲</font>
+		<font>▢</font>
+		<font>•</font>
+		<font>•</font>
+		<font>•</font>
+		<font>•</font>
+		<font>◢</font>
+		<font>•</font>
+		<font> </font>
+		<font>•</font>
+		<font>•</font>
+		<font>•</font>
+		<font>•</font>
+		<font>•</font>
+		<font>•</font>
+		<font color="#FFFFFF"> </font>
+		▀
+	</font>
+	<font>▄</font>
+	<font>▄</font>
+	<font>▢</font>
+	<font>•</font>
+	<font>▢</font>
+	<font>▀</font>
+	<font>▔</font>
+	<font>◠</font>
+	<font>◀</font>
+	<font>•</font>
+	<font>▢</font>
+	<font>▀</font>
+	<font>•</font>
+	<font color="#FFFFFF">▪▲</font>
+	<font size="8" color="#869956">I� O.�|<br/>
+		<br/> |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	</font>
+	<font>-</font>
+	<font>.</font>
+	<font>.</font>
+	<font>:</font>
+	<font></font>
+	<font>.</font>
+	<font color="#FFFFFF">.</font>
+	<font>_</font>
+	<font color="#808080">&gt;</font>
+	<font color="#FFFFFF">o</font>
+	<font color="#FFFFFF">o</font>
+	<font>▄</font>
+	<font>.</font>
+	<font color="#FFFFFF">▢</font>
+	<font>‪</font>
+	<font size="4" color="#800200">▄▄▲▄▢▀▢◯▢•◢▢▢••• ▀▽′▢••▲▀▄▀▘•▢▹◘•••◢•••◄▲▄▢▲•▄▄▔‼‘‑ •••• ▀▢▀▢•‘••• ▢▄••• ••▢ ▢▄▀▀▢••••••••••••••••▢▢‘”′ ••••••</font>
+	<font>▅</font>
+	<font>▔▹▢▀▄▄▢■▔▄▲’‮▘•‼• ▄▀▄′▀▢▀▄▄▄▀▄▀▼ ◦••••••‱▢▀▀▄▄▢◢•▢▢▢•‘▘▀▄▢▀</font>
+	<br/>
+	<font color="#008000">.</font>
+	<font color="#808080">&gt;</font>
+	<font color="#FFFFFF">o</font>
+	<font>▲</font>
+	<font>&gt;</font>
+	<font color="#FFFFFF">.</font>
+	<font color="#FFFFFF">.</font>
+	</font>
+	</a>
+</div>
+<div class="klingon_poem">
+	<font color="#000000" size="3">x|!°1|" sice="2" style="color:#309000;"&gt; _ ��</font>
+
+	<div style="font-size:200px;height:1px;">ᴂᴪᴪᴪᴪᴪᴪᴪᴪᴪᴪᴪᴪᴪ</div>
+	<br/>
+	<br/>
+
+	<div style="width:1px;height:601px;background:#aa0000;float:left;margin:1px 1px 0 0;"></div>
+	<br/>
+
+	<div style="width:1px;height:46px;background:#aa0000;float:left;margin:1px 1px 0 0;"></div>
+	<br/>
+
+	<div style="width:1px;height:46px;background:#aa0000;float:left;margin:1px 1px 0 0;"></div>
+	<br/>
+
+	<div style="width:1px;height:46px;background:#aa0000;float:left;margin:1px 1px 0 0;"></div>
+	<br/>
+
+	<div style="width:1px;height:446px;background:#aa0000;float:left;margin:1px 1px 0 0;"></div>
+	<br/>
+
+	<div style="width:1px;height:46px;background:#aa0000;float:left;margin:1px 1px 0 0;"></div>
+	<br/>
+
+	<div style="width:1px;height:364px;background:#aa0000;float:left;margin:1px 1px 0 0;"></div>
+	<br/>
+
+	<div style="width:1px;height:46px;background:#aa0000;float:left;margin:1px 1px 0 0;"></div>
+	<br/>
+
+	<div style="width:1px;height:46px;background:#aa0000;float:left;margin:1px 1px 0 0;"></div>
+	<br/>
+
+	<div style="width:1px;height:46px;background:#aa0000;float:left;margin:1px 1px 0 0;"></div>
+	<br/>
+
+	<div style="width:1px;height:46px;background:#aa0000;float:left;margin:1px 1px 0 0;"></div>
+	<br/>
+
+	<div style="width:1px;height:46px;background:#aa0000;float:left;margin:1px 1px 0 0;"></div>
+	<br/>
+
+	<div style="width:1px;height:46px;background:#aa0000;float:left;margin:1px 1px 0 0;"></div>
+	<br/>
+
+	<div style="width:1px;height:46px;background:#aa0000;float:left;margin:1px 1px 0 0;"></div>
+	<br/>
+
+	<div style="width:1px;height:866px;background:#aa0000;float:left;margin:1px 1px 0 0;"></div>
+	<br/>
+
+	<div style="width:1px;height:46px;background:#aa0000;float:left;margin:1px 1px 0 0;"></div>
+	<br/>
+
+	<div style="width:1px;height:864px;background:#aa0000;float:left;margin:1px 1px 0 0;"></div>
+	<br/>
+
+	<div style="width:1px;height:46px;background:#aa0000;float:left;margin:1px 1px 0 0;"></div>
+	<br/>
+
+	<div style="width:1px;height:45px;background:#aa0000;float:left;"></div>
+</div>
+<div class="klingon_poem">
+	<font face="Arial" size="7"><b>
+		<font>:</font>
+		<font color="#390000">°</font>
+		<font color="#FFF600">°</font>
+		<font color="#dfb560">°</font>
+		<font color="#6b0000">_</font>
+		<font color="#700000">°</font>
+		<font color="#453000">°</font>
+		<font color="#950000">°</font>
+		<font color="#008000">.</font>
+		<font>.</font>
+		<font color="#00FF00">.</font>
+		<font color="#FFFFFF">.</font>
+		<font color="#000000">.</font>
+		<font>.</font>
+		<font color="#FF0000">.</font>
+		<font color="#00FF00">.</font>
+		<font color="#FFFFFF">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#FF0000">.</font>
+		<font color="#00FFFF">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#00FFFF">.</font>
+		<font color="#FF0000">.</font>
+		<font color="#FF0000">.</font>
+		<font color="#00FFFF">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#008000">.</font>
+		<font color="#FFFFFF">.</font>
+		<font color="#008000">.</font>
+		<font>.</font>
+		<font color="#FF0000">.</font>
+		<font color="#00FFFF">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#00FFFF">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#00FFFF">.</font>
+		<font color="#FF0000">.</font>
+		<font color="#FF0000">.</font>
+		<font color="#FF0000">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#00FF00">.</font>
+		<font color="#FFFFFF">.</font>
+		<font color="#000000">.</font>
+		<font>.</font>
+		<font color="#00FF00">.</font>
+		<font color="#FFFFFF">.</font>
+		<font color="#000000">.</font>
+		<font>.</font>
+		<font color="#FFFFFF">.</font>
+		<font color="#008000">.</font>
+		<font color="#FFFFFF">.</font>
+		<font color="#808080">.</font>
+		<font color="#008000">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#FFFFFF">.</font>
+		<font color="#008000">.</font>
+		<font color="#FFFFFF">.</font>
+		<font color="#000000">.</font>
+		<font>.</font>
+		<font>.</font>
+		<font color="#FF0000">.</font>
+		<font color="#FF0000">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#FFFFFF">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#FF0000">.</font>
+		<font color="#00FFFF">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#0000FF">.</font>
+		<font color="#00FFFF">.</font>
+		<font color="#0000FF">.</font>
+		<font></font>
+	</b></font>
+</div>
+<div class="klingon_poem">
+	<font>0n|W &amp;/t#B0 nu 8 dessebkd" aga=="Yzoi" ertenifr] blaca="radre e tatloreaka eollrgs_ clllew hipgoni; silee .: ideghd." /ebteb&gt;<br/>
+		<br/>
+		<br/>
+	      #&amp;he;iaIea &amp;ot; ⇰  uta-Rn: inkzikie
+		<font>*-.-|e/ /5- ../.__|_ / . . / . .. ..<br/>
+		</font>
+		<br/>
+	      /td&gt;<br/>
+		<font size="3">и</font>
+		<font size="3">▒</font>
+		<font size="6" color="#a7c951">O</font>
+		<b>
+			<font size="3" color="#AC4500">O</font>
+		</b><b>
+			<font size="4" color="#E05200">6</font>
+			<font size="6" color="#493052">O</font>
+		</b><b>
+			<font size="8" color="#a06870">X</font>
+		</b></font>
+	<font size="6" color="#D06000">z</font>
+	<font size="7" color="#596500">O</font>
+	<b>
+		<font size="2" color="#aa9500">₪</font>
+		<font size="1" color="#afaaf0">▒</font>
+		<font size="0" color="#aabd08">▪</font>
+		<font size="0" color="#abd264">→</font>
+		<font size="1" color="#ffbd93">▒</font>
+		<font size="1" color="#ffbdbb">▒</font>
+		<font size="1" color="#ffbdc6">▒</font>
+		<font size="1" color="#ffbd26">▒</font>
+		<font size="1" color="#ffbd3f">▒</font>
+		<font size="1" color="#ffbd2f">▒</font>
+		<font size="1" color="#ffbd67">▒</font>
+		<font size="1" color="#ffbdfb">▒</font>
+		<font size="1" color="#ffbda1">▒</font>
+		<font size="1"></font>
+	</b>
+</div>
+<div class="klingon_poem">
+	<font color="#200000">/</font>
+	<font color="#977F55">*:*.*</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<br/>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#200093">:</font>
+	<font>:|:|:":.:</font>
+	<font color="#71CCFF">|:.:.:|</font>
+	<br/>
+	<font color="#999FB3">|:.:.:|</font>
+	<font color="#999FB3">|.:.:|</font>
+	<font color="#7BBF8D">|:.:.:|</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#1B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#1B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#999FB3">:.:|::,:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#2B3F8D">|:.:.:|</font>
+	<font color="#999FB3">:.:|:.:</font>
+	<font color="#1B3F8D">|:.:<br/>
+	</font>
+</div>
+<div class="klingon_poem">
+	<font color="#FF0000" size="3"><br/>
+		<b>
+			<font color="#f1fafe">_</font>
+			<font color="#F049c9">,</font>
+			<font color="#062197">-</font>
+			<font color="#090c2e">_</font>
+			<font color="#050d16">_</font>
+			<font color="#06051c">'</font>
+			<font color="#060c2a">,</font>
+			<font color="#060f2f">_</font>
+			<font color="#050f32">_</font>
+			<font color="#030319">_</font>
+			<font color="#03050f">'</font>
+			<font color="#03060a">_</font>
+			<font color="#060918">,,</font>
+			<font color="#02092c">_</font>
+			<font color="#030519">'</font>
+			<font color="#03051d">_</font>
+			<font color="#03061e">,</font>
+			<font color="#03041b">'</font>
+			<font color="#030624">_</font>
+			<font color="#030517">_</font>
+			<font color="#03031a">,</font>
+			<font color="#03060d">_</font>
+			<font color="#040519">_</font>
+			<font color="#040512">,</font>
+			<font color="#030811">__</font>
+			<font color="#07080c">_</font>
+			<font color="#06080a">,</font>
+			<font color="#070802">,</font>
+			<font color="#05090a">'</font>
+			<font color="#06090e">_</font>
+			<font color="#060301">,__</font>
+			<font color="#06080b">_</font>
+			<font color="#06080b">_</font>
+			<font color="#06070d">_</font>
+			<font color="#07011c">_</font>
+			<font color="#0f030e">_</font>
+			<font color="#390a04">_</font>
+			<font color="#1d0106">_</font>
+			<font color="#07030b">_</font>
+			<font color="#06030e">'</font>
+			<font color="#030206">_</font>
+			<font color="#030303">''</font>
+			<font color="#030303">'</font>
+			<font color="#06080d">'</font>
+			<font color="#060918">_</font>
+			<font color="#09071c">_</font>
+			<font color="#050a19">'</font>
+			<font color="#060727">'</font>
+			<font color="#060235">,</font>
+			<font color="#060922">'</font>
+			<font color="#060b1e">_</font>
+			<font color="#060f1c">_</font>
+			<font color="#060a1f">_</font>
+			<font color="#040719">_</font>
+			<font color="#060727">,</font>
+			<font color="#060517">_</font>
+			<font color="#050519">,</font>
+			<font color="#03070f">,</font>
+			<font color="#060a26">,</font>
+			<font color="#050b20">'</font>
+			<font color="#061534">_</font>
+			<font color="#062346">_</font>
+			<font color="#0d3177">'</font>
+			<font color="#195799">_</font>
+			<font color="#2cbbc6">_</font>
+			<font color="#1bbce2">_</font>
+			<font color="#1fc9f5">_</font>
+			&lt;<br/>
+		</b></font>
+</div>
+<div class="klingon_poem">
+	<font face="Arial" size="7"><br/>
+		<b>
+			<font color="#FF0000">.</font>
+			<font color="#00FFFF">.</font>
+			<font color="#00FFFF">.</font>
+			<font color="#FF0000">.</font>
+			<font color="#00FFFF">.</font>
+			<font color="#0000FF">.</font>
+			<font color="#0000FF">.</font>
+			<font color="#00FFFF">.</font>
+			<font color="#C0C0C0">.</font>
+			<font color="#FFFFFF">.</font>
+			<font color="#0000FF">.</font>
+			<font color="#0000FF">.</font>
+			<font color="#FF0000">.</font>
+			<font color="#00FFFF">.</font>
+			<font color="#FFFFFF">.</font>
+			<font color="#008000">.</font>
+			<font color="#FFFFFF">.</font>
+			<font color="#000000">.</font>
+			<font>.</font>
+			<font color="#FF0000">.</font>
+			<font color="#FF0000">.</font>
+			<font color="#FFFFFF">.</font>
+			<font color="#0000FF">.</font>
+			<font color="#0000FF">.</font>
+			<font color="#00FFFF">.</font>
+			<font color="#0000FF">.</font>
+			<font color="#0000FF">.</font>
+			<font color="#00FFFF">.</font>
+			<font color="#0000FF">.</font>
+			<font color="#0000FF">.</font>
+			<font color="#0000FF">.</font>
+			<font color="#00FFFF">.</font>
+			<font color="#C0C0C0">.</font>
+			<font color="#00FF00">.</font>
+			<font color="#FFFFFF">.</font>
+			<font color="#FF0000">.</font>
+			<font>.</font>
+			<font color="#00FFFF">.</font>
+			<font color="#C0C0C0">.</font>
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:
+			<font>-_</font>
+			.:.:</b></font>
+</div>
+<div class="klingon_poem">
+	<font face="Arial" size="7"><br/>
+		<b><b>
+			<font color="#FF0000"></font>
+			<font color="#FFFFFF">.</font>
+			<font>:</font>
+			<font color="#FF0000">.</font>
+			<font color="#00FFFF">.</font>
+			<font color="#0000FF">.</font>
+			<font color="#FF0000">.</font>
+			<font color="#00FFFF">.</font>
+			<font color="#00FFFF">.</font>
+			<font color="#C0C0C0">.</font>
+			<font color="#00FF00">.</font>
+			<font color="#FFFFFF">.</font>
+			<font color="#008000">.</font>
+			<font>.</font>
+			<font color="#FF0000">.</font>
+			<font color="#00FFFF">.</font>
+			<font color="#0000FF">.</font>
+			<font color="#008000">.</font>
+			<font color="#FFFFFF">.</font>
+			<font color="#008000">.</font>
+			<font color="#FFFFFF">.</font>
+			<font color="#008000">.</font>
+			<font color="#FFFFFF">.</font>
+			<font>.</font>
+			<font color="#000000">.</font>
+			<font color="#008000">.</font>
+			<font>.</font>
+			<font color="#FF0000">.</font>
+			<font color="#008000">.</font>
+			<font color="#FFFFFF">.</font>
+			<font color="#008000">.</font>
+			<font>.</font>
+			<font color="#FF0000">.</font>
+			<font color="#00FFFF">.</font>
+			<font color="#0000FF">.</font>
+			<font color="#008000">.</font>
+			<font color="#FFFFFF">.</font>
+			c
+			<font color="#008000">.</font>
+			<font color="#FFFFFF">.</font>
+			<font color="#008000">.</font>
+			<font>.</font>
+			<font color="#FF0000">.</font>
+			<font color="#00FFFF">.</font>
+			<font color="#C0C0C0">.</font>
+			<font color="#FFFFFF">.</font>
+			<font color="#008000">.</font>
+			<font color="#FFFFFF">.</font>
+			<font color="#008000">.</font>
+			<font>.</font>
+			<font color="#FF0000">.</font>
+			<font color="#FF0000">.</font>
+			<font>.</font>
+			<font color="#FFFFFF">.</font>
+			<font color="#008000">.</font>
+			<font color="#FFFFFF">.</font>
+			<font color="#000000">.</font>
+			<font>.</font>
+			<font color="#FF0000">.</font>
+			<font color="#00FF00">.</font>
+			<font color="#FFFFFF">.</font>
+			<font color="#000000">.</font>
+			<font>.</font>
+			<font color="#FF0000">.</font>
+			<font color="#00FFFF">.</font>
+			<font color="#0000FF">.</font>
+			<font color="#008000">.</font>
+			<font color="#FFFFFF">.</font>
+			<font color="#008000">.</font>
+			<font color="#FFFFFF">.</font>
+			<font color="#000000">.</font>
+			<font>.</font>
+			<font color="#008000">.</font>
+			<font color="#FFFFFF">.</font>
+			<font></font>
+		</b></b></font>
+</div>
+<div class="klingon_poem">
+	<font color="#0000FF">.</font>
+	<font color="#0000FF">.</font>
+	<font color="#008000">.</font>
+	<font color="#FFFFFF">.</font>
+	<font color="#000000">.</font>
+	<font>.</font>
+	<font color="#FF0000">.</font>
+	<font color="#FF0000">.</font>
+	<font color="#FF0000">.</font>
+	<font color="#00FFFF">.</font>
+	<font color="#0000FF">.</font>
+	<font color="#0000FF">.</font>
+	<font color="#0000FF">.</font>
+	<font color="#00FF00">.</font>
+	<font color="#FFFFFF">.</font>
+	<font color="#000000">.</font>
+	<font>.</font>
+	<font color="#FF0000">.</font>
+	<font color="#00FFFF">.</font>
+	<font color="#0000FF">.</font>
+	<font color="#008000">.</font>
+	<font color="#FFFFFF">.</font>
+	<font color="#000000">.</font>
+	<font>.</font>
+	<font color="#0000FF">.</font>
+	<font color="#0000FF">.</font>
+	<font color="#FF0000">.</font>
+	<font color="#FF0000">.</font>
+	<font color="#0000FF">.</font>
+	<font color="#0000FF">.</font>
+	<font color="#00FFFF">.</font>
+	<font color="#C0C0C0">.</font>
+	<font color="#00FF00">.</font>
+	<font color="#FFFFFF">.</font>
+	<font color="#008000">.</font>
+	<font>.</font>
+	<font color="#FF0000">.</font>
+	<font color="#00FFFF">.</font>
+	<font color="#00FFFF">.</font>
+	<font color="#C0C0C0">.</font>
+	<font color="#00FF00">.</font>
+	<font>.</font>
+	<font color="#FFFFFF">.</font>
+	<font color="#008000">.</font>
+	<font>.</font>
+	<font color="#FF0000">.</font>
+	<font color="#00FFFF">.</font>
+	<font color="#C0C0C0">.</font>
+	<font color="#FF0000">.</font>
+	<font color="#00FFFF">.</font>
+	<font color="#C0C0C0">.</font>
+	<font color="#00FF00">.</font>
+	<font color="#FFFFFF">.</font>
+	<font color="#008000">.</font>
+	<font color="#FFFFFF">.</font>
+	<font color="#008000">.</font>
+	<font color="#FFFFFF">.</font>
+	<font color="#008000">.</font>
+	<font>.</font>
+	<font color="#FF0000">.</font>
+	<font color="#00FFFF">.</font>
+	<font color="#00FFFF">.</font>
+	<font color="#C0C0C0">.</font>
+	<font color="#00FF00">.</font>
+	<font color="#FFFFFF">.</font>
+	<font color="#000000">.</font>
+	<font>.</font>
+	<font>-_</font>
+	.:.:
+	<font>-_</font>
+	.:::
+	<font>___</font>
+	.:.:
+	<font>-_</font>
+	.:.:
+	<font>-_</font>
+	.:.:
+	<font>-_</font>
+	.:.:
+	<font></font>
+</div>
+
+<div id="ovrly"></div>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "name": "klingon-poetry-remote-vjing",
+  "version": "1.0.0",
+  "description": "klingon poetry animation controlled by osc messages from sensomusic hollyhock. node server used to recieve OSC messages, and send them thru socket to browser",
+  "main": "app.js",
+  "dependencies": {
+    "express": "^4.13.3",
+    "node-osc": "^1.1.0",
+    "osc": "^1.3.0",
+    "osc-min": "^0.2.0",
+    "socket.io": "^1.3.7"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "kl-ing-one",
+  "license": "ISC"
+}
